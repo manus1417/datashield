@@ -1,37 +1,44 @@
 import { NextResponse } from "next/server";
-import { hash } from "argon2";
 import { db } from "~/utils/db";
 import { auth } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
   try {
-    const { fileURL, secretKey } = await req.json();
     const { userId } = await auth();
-
-    if (!fileURL || !secretKey || !userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Missing data" },
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { fileUrl, fileName } = await req.json();
+
+    if (!fileUrl || !fileName) {
+      return NextResponse.json(
+        { success: false, message: "Invalid file data" },
         { status: 400 }
       );
     }
 
-    const key = await hash(secretKey);
-
-    await db.file.create({
+    // Save file info to the database
+    const savedFile = await db.file.create({
       data: {
-        name: fileURL.split("/").pop() || "Unknown",
-        key,
+        name: fileName,
+        url: fileUrl,
         user: userId,
-        fragments: [fileURL], 
-        retrieveFragments: [fileURL], 
       },
     });
 
-    return NextResponse.json({ success: true, message: "File stored" }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: "File metadata saved successfully",
+      file: savedFile,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Error saving file info:", error);
     return NextResponse.json(
-      { success: false, message: "Error storing file info" },
+      { success: false, message: "Error saving file info" },
       { status: 500 }
     );
   }
