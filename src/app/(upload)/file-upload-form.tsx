@@ -7,7 +7,6 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 
 export default function FileUploadForm() {
   const [file, setFile] = useState<File | null>(null);
-  const [key, setKey] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -25,31 +24,35 @@ export default function FileUploadForm() {
     setIsError(false);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("secretKey", key);
+      console.log("📤 Requesting Upload URL...");
+      const uploadUrlRes = await fetch("/api/upload", { method: "POST" });
+      const { uploadUrl } = await uploadUrlRes.json();
 
-      console.log("📤 Sending Request to API...");
-      
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-        headers: {
-          // ❌ DO NOT set Content-Type manually, let the browser handle it!
-        },
+      if (!uploadUrl) throw new Error("Upload URL generation failed");
+
+      console.log("📤 Uploading File to Vercel Blob...");
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
       });
 
-      const data = await response.json();
+      if (!uploadRes.ok) throw new Error("Upload failed");
 
-      if (response.ok) {
-        setUploadStatus("✅ File uploaded successfully!");
-        setFile(null); 
-        setKey(""); 
-        (document.getElementById("fileInput") as HTMLInputElement).value = ""; 
-      } else {
-        setUploadStatus(data.message || "❌ Failed to upload file.");
-        setIsError(true);
-      }
+      const fileUrl = uploadRes.url;
+
+      console.log("📥 Saving file metadata...");
+      const saveRes = await fetch("/api/save-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl, fileName: file.name }),
+      });
+
+      if (!saveRes.ok) throw new Error("Failed to save file metadata");
+
+      setUploadStatus("✅ File uploaded and saved successfully!");
+      setFile(null);
+      (document.getElementById("fileInput") as HTMLInputElement).value = "";
     } catch (error) {
       console.error("❌ Upload error:", error);
       setUploadStatus("❌ An error occurred during upload. Please try again.");
@@ -67,18 +70,6 @@ export default function FileUploadForm() {
           type="file"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           aria-label="Select file to upload"
-        />
-      </div>
-      <div>
-        <label htmlFor="key">Password</label>
-        <Input
-          type="password"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          id="key"
-          name="key"
-          placeholder="Enter password"
-          className="w-full"
         />
       </div>
       <Button type="submit" disabled={uploading} className="w-full">
