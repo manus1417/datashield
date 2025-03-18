@@ -25,44 +25,34 @@ export default function FileUploadForm() {
     setIsError(false);
 
     try {
-      // Step 1: Get a secure upload URL from the backend
-      const res = await fetch("/api/upload", { method: "POST" });
-      const { url, token } = await res.json();
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("secretKey", key);
 
-      if (!url || !token) {
-        throw new Error("Failed to get upload URL.");
-      }
-
-      // Step 2: Upload the file directly to Vercel Blob
-      const uploadRes = await fetch(url, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload file.");
-      }
-
-      // Step 3: Notify the backend (store file URL in DB)
-      const fileURL = uploadRes.url;
-      const saveRes = await fetch("/api/save-file", {
+      console.log("📤 Sending Request to API...");
+      
+      const response = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileURL, secretKey: key }),
+        body: formData,
+        headers: {
+          // ❌ DO NOT set Content-Type manually, let the browser handle it!
+        },
       });
 
-      if (!saveRes.ok) {
-        throw new Error("Failed to save file details.");
-      }
+      const data = await response.json();
 
-      setUploadStatus("✅ File uploaded successfully!");
-      setFile(null);
-      setKey("");
-      (document.getElementById("fileInput") as HTMLInputElement).value = "";
+      if (response.ok) {
+        setUploadStatus("✅ File uploaded successfully!");
+        setFile(null); 
+        setKey(""); 
+        (document.getElementById("fileInput") as HTMLInputElement).value = ""; 
+      } else {
+        setUploadStatus(data.message || "❌ Failed to upload file.");
+        setIsError(true);
+      }
     } catch (error) {
-      console.error("Upload error:", error);
-      setUploadStatus("❌ An error occurred during upload.");
+      console.error("❌ Upload error:", error);
+      setUploadStatus("❌ An error occurred during upload. Please try again.");
       setIsError(true);
     } finally {
       setUploading(false);
@@ -76,7 +66,6 @@ export default function FileUploadForm() {
           id="fileInput"
           type="file"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
           aria-label="Select file to upload"
         />
       </div>
@@ -98,7 +87,7 @@ export default function FileUploadForm() {
 
       {uploadStatus && (
         isError ? (
-          <Alert variant="destructive"> 
+          <Alert variant="destructive">
             <AlertDescription>{uploadStatus}</AlertDescription>
           </Alert>
         ) : (
