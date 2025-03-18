@@ -24,35 +24,26 @@ export default function FileUploadForm() {
     setIsError(false);
 
     try {
-      console.log("📤 Requesting Upload URL...");
-      const uploadUrlRes = await fetch("/api/upload", { method: "POST" });
-      const { uploadUrl } = await uploadUrlRes.json();
+      console.log("📤 Uploading file...");
 
-      if (!uploadUrl) throw new Error("Upload URL generation failed");
+      const formData = new FormData();
+      formData.append("file", file);
 
-      console.log("📤 Uploading File to Vercel Blob...");
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-
-      if (!uploadRes.ok) throw new Error("Upload failed");
-
-      const fileUrl = uploadRes.url;
-
-      console.log("📥 Saving file metadata...");
-      const saveRes = await fetch("/api/save-file", {
+      const response = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileUrl, fileName: file.name }),
+        body: formData,
       });
 
-      if (!saveRes.ok) throw new Error("Failed to save file metadata");
+      const data = await response.json();
 
-      setUploadStatus("✅ File uploaded and saved successfully!");
-      setFile(null);
-      (document.getElementById("fileInput") as HTMLInputElement).value = "";
+      if (response.ok) {
+        setUploadStatus(`✅ File uploaded successfully! URL: ${data.fileUrl}`);
+        setFile(null);
+        (document.getElementById("fileInput") as HTMLInputElement).value = "";
+      } else {
+        setUploadStatus(data.message || "❌ Failed to upload file.");
+        setIsError(true);
+      }
     } catch (error) {
       console.error("❌ Upload error:", error);
       setUploadStatus("❌ An error occurred during upload. Please try again.");
