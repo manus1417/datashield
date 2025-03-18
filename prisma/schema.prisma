@@ -21,5 +21,4 @@ model File {
   user      String
   fragments String[]
   retrieveFragments String[]
-  user      String
 }
