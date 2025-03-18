@@ -25,29 +25,44 @@ export default function FileUploadForm() {
     setIsError(false);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("secretKey", key);
+      // Step 1: Get a secure upload URL from the backend
+      const res = await fetch("/api/upload", { method: "POST" });
+      const { url, token } = await res.json();
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      if (!url || !token) {
+        throw new Error("Failed to get upload URL.");
+      }
+
+      // Step 2: Upload the file directly to Vercel Blob
+      const uploadRes = await fetch(url, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: file,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setUploadStatus("✅ File uploaded successfully!");
-        setFile(null); 
-        setKey(""); 
-        (document.getElementById("fileInput") as HTMLInputElement).value = ""; 
-      } else {
-        setUploadStatus(data.message || "❌ Failed to upload file.");
-        setIsError(true);
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload file.");
       }
+
+      // Step 3: Notify the backend (store file URL in DB)
+      const fileURL = uploadRes.url;
+      const saveRes = await fetch("/api/save-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileURL, secretKey: key }),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error("Failed to save file details.");
+      }
+
+      setUploadStatus("✅ File uploaded successfully!");
+      setFile(null);
+      setKey("");
+      (document.getElementById("fileInput") as HTMLInputElement).value = "";
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadStatus("❌ An error occurred during upload. Please try again.");
+      setUploadStatus("❌ An error occurred during upload.");
       setIsError(true);
     } finally {
       setUploading(false);
@@ -83,11 +98,11 @@ export default function FileUploadForm() {
 
       {uploadStatus && (
         isError ? (
-          <Alert variant="destructive"> {/*  Show error in alert */}
+          <Alert variant="destructive"> 
             <AlertDescription>{uploadStatus}</AlertDescription>
           </Alert>
         ) : (
-          <p className="text-green-500 text-sm">{uploadStatus}</p> //Success message in green text
+          <p className="text-green-500 text-sm">{uploadStatus}</p>
         )
       )}
     </form>
