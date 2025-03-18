@@ -18,6 +18,7 @@ model File {
   name      String
   key       String
   url       String
+  user      String
   fragments String[]
   retrieveFragments String[]
   user      String
