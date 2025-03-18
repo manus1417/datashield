@@ -17,8 +17,7 @@ model File {
   id        String   @id @default(cuid())
   name      String
   key       String
-  url       String
-  user      String
   fragments String[]
   retrieveFragments String[]
+  user      String
 }
